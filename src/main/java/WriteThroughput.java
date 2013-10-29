@@ -33,6 +33,9 @@ public class WriteThroughput
 
     public void go()
     {
+        EthernetAddress nic = EthernetAddress.fromInterface();
+        TimeBasedGenerator generator = Generators.timeBasedGenerator( nic );
+
         final GraphDatabaseService db = new GraphDatabaseFactory().newEmbeddedDatabase( dbPath.toString() );
         ExecutionEngine engine = new ExecutionEngine( db, StringLogger.DEV_NULL );
 
@@ -48,14 +51,17 @@ public class WriteThroughput
 
                 for ( int batch = 0; batch < BATCH_SIZE; i++, batch++ )
                 {
+
+                    UUID name = generateName( generator );
+
                     Map<String, Object> properties = new HashMap<>();
-                    properties.put( "name", "name" + i );
+                    properties.put( "name", name.toString() );
                     final ExecutionResult executionResult = engine.execute(
                             "START root = node(" + rootNodeId + ") " +
-                            "CREATE (n {name: {name}}) -[:LIKES]->(root) return n as theNode",
+                                    "CREATE (n {name: {name}}) -[:LIKES]->(root) return n as theNode",
                             properties );
 
-                    indexIt( db, executionResult );
+                    indexIt( db, executionResult, name );
 
                     tx.success();
                 }
@@ -76,22 +82,22 @@ public class WriteThroughput
         new WriteThroughput(1).go();
         new WriteThroughput(10).go();
         new WriteThroughput(100).go();
+        new WriteThroughput(1000).go();
     }
 
-    private static void indexIt( GraphDatabaseService db, ExecutionResult executionResult )
+    private static void indexIt( GraphDatabaseService db, ExecutionResult executionResult, UUID name )
     {
-        EthernetAddress nic = EthernetAddress.fromInterface();
-        // or bogus which would be gotten with: EthernetAddress.constructMulticastAddress()
-        TimeBasedGenerator uuidGenerator = Generators.timeBasedGenerator( nic );
-        // also: we don't specify synchronizer, getting an intra-JVM syncer; there is
-        // also external file-locking-based synchronizer if multiple JVMs run JUG
-        UUID name = uuidGenerator.generate();
-
         Node theNode = (Node) executionResult.iterator().next().get( "theNode" );
 
         Index<Node> whatever = db.index().forNodes( "Whatever" );
         whatever.remove( theNode, "name", name );
         whatever.add( theNode, "name", name );
+    }
+
+    private static UUID generateName( TimeBasedGenerator generator )
+    {
+
+        return generator.generate();
     }
 
     private static long createRootNode( GraphDatabaseService database )
