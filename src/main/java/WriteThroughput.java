@@ -1,8 +1,6 @@
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.UUID;
 
 import com.fasterxml.uuid.EthernetAddress;
@@ -10,7 +8,7 @@ import com.fasterxml.uuid.Generators;
 import com.fasterxml.uuid.impl.TimeBasedGenerator;
 
 import org.neo4j.cypher.javacompat.ExecutionEngine;
-import org.neo4j.cypher.javacompat.ExecutionResult;
+import org.neo4j.graphdb.DynamicRelationshipType;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Transaction;
@@ -37,7 +35,6 @@ public class WriteThroughput
         TimeBasedGenerator generator = Generators.timeBasedGenerator( nic );
 
         final GraphDatabaseService db = new GraphDatabaseFactory().newEmbeddedDatabase( dbPath.toString() );
-        ExecutionEngine engine = new ExecutionEngine( db, StringLogger.DEV_NULL );
 
         long rootNodeId = createRootNode( db );
 
@@ -51,17 +48,13 @@ public class WriteThroughput
 
                 for ( int batch = 0; batch < BATCH_SIZE; i++, batch++ )
                 {
-
                     UUID name = generateName( generator );
+                    Node node = db.createNode();
+                    node.setProperty( "name", name.toString() );
 
-                    Map<String, Object> properties = new HashMap<>();
-                    properties.put( "name", name.toString() );
-                    final ExecutionResult executionResult = engine.execute(
-                            "START root = node(" + rootNodeId + ") " +
-                                    "CREATE (n {name: {name}}) -[:LIKES]->(root) return n as theNode",
-                            properties );
+                    node.createRelationshipTo( db.getNodeById( rootNodeId ), DynamicRelationshipType.withName( "LIKES" ) );
 
-                    indexIt( db, executionResult, name );
+                    indexIt( db, node );
 
                     tx.success();
                 }
@@ -85,13 +78,11 @@ public class WriteThroughput
         new WriteThroughput(1000).go();
     }
 
-    private static void indexIt( GraphDatabaseService db, ExecutionResult executionResult, UUID name )
+    private static void indexIt( GraphDatabaseService db, Node theNode )
     {
-        Node theNode = (Node) executionResult.iterator().next().get( "theNode" );
-
         Index<Node> whatever = db.index().forNodes( "Whatever" );
-        whatever.remove( theNode, "name", name );
-        whatever.add( theNode, "name", name );
+        whatever.remove( theNode, "name", theNode );
+        whatever.add( theNode, "name", theNode );
     }
 
     private static UUID generateName( TimeBasedGenerator generator )
