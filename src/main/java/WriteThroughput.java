@@ -5,6 +5,10 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+import com.fasterxml.uuid.EthernetAddress;
+import com.fasterxml.uuid.Generators;
+import com.fasterxml.uuid.impl.TimeBasedGenerator;
+
 import org.neo4j.cypher.javacompat.ExecutionEngine;
 import org.neo4j.cypher.javacompat.ExecutionResult;
 import org.neo4j.graphdb.GraphDatabaseService;
@@ -76,7 +80,12 @@ public class WriteThroughput
 
     private static void indexIt( GraphDatabaseService db, ExecutionResult executionResult )
     {
-        UUID name = UUID.randomUUID();
+        EthernetAddress nic = EthernetAddress.fromInterface();
+        // or bogus which would be gotten with: EthernetAddress.constructMulticastAddress()
+        TimeBasedGenerator uuidGenerator = Generators.timeBasedGenerator( nic );
+        // also: we don't specify synchronizer, getting an intra-JVM syncer; there is
+        // also external file-locking-based synchronizer if multiple JVMs run JUG
+        UUID name = uuidGenerator.generate();
 
         Node theNode = (Node) executionResult.iterator().next().get( "theNode" );
 
