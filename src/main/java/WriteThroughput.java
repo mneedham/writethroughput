@@ -45,6 +45,7 @@ public class WriteThroughput
                         final Random random = new Random();
                         final String name = generateName( generator ).toString();
                         final String group = generateName( generator ).toString();
+                        final String status = generateName( generator ).toString();
 
                         UniqueFactory.UniqueNodeFactory factory = new UniqueFactory.UniqueNodeFactory(db, "Whatever" ) {
                             protected void initialize(Node node, Map<String, Object> _) {
@@ -52,6 +53,9 @@ public class WriteThroughput
                                 node.setProperty( "activityLevel", random.nextLong() );
                                 node.setProperty( "rank", random.nextLong() );
                                 node.setProperty( "group", group );
+                                node.setProperty( "status", status );
+                                node.setProperty( "points", String.valueOf(random.nextLong()) );
+                                node.setProperty( "cash", String.valueOf(random.nextLong()) );
                             }
                         };
 
@@ -70,6 +74,10 @@ public class WriteThroughput
                         node.setProperty( "activityLevel", random.nextLong() );
                         node.setProperty( "rank", random.nextLong() );
                         node.setProperty( "group", generateName( generator ).toString() );
+                        node.setProperty( "status", generateName( generator ).toString() );
+                        node.setProperty( "points", String.valueOf(random.nextLong()) );
+                        node.setProperty( "cash", String.valueOf(random.nextLong()) );
+
 
                         return node;
                     }
