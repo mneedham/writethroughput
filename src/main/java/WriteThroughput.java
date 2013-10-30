@@ -1,9 +1,11 @@
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -40,11 +42,16 @@ public class WriteThroughput
                     @Override
                     Node createNodeAndIndex( TimeBasedGenerator generator, GraphDatabaseService db )
                     {
+                        final Random random = new Random();
                         final String name = generateName( generator ).toString();
+                        final String group = generateName( generator ).toString();
 
                         UniqueFactory.UniqueNodeFactory factory = new UniqueFactory.UniqueNodeFactory(db, "Whatever" ) {
                             protected void initialize(Node node, Map<String, Object> _) {
                                 node.setProperty( "name", name );
+                                node.setProperty( "activityLevel", random.nextLong() );
+                                node.setProperty( "rank", random.nextLong() );
+                                node.setProperty( "group", group );
                             }
                         };
 
@@ -56,9 +63,13 @@ public class WriteThroughput
                     @Override
                     Node createNodeAndIndex( TimeBasedGenerator generator, GraphDatabaseService db )
                     {
+                        Random random = new Random();
                         Node node = db.createNode();
-                        final String name = generateName( generator ).toString();
-                        node.setProperty( "name", name );
+
+                        node.setProperty( "name", generateName( generator ).toString() );
+                        node.setProperty( "activityLevel", random.nextLong() );
+                        node.setProperty( "rank", random.nextLong() );
+                        node.setProperty( "group", generateName( generator ).toString() );
 
                         return node;
                     }
@@ -78,17 +89,26 @@ public class WriteThroughput
 
     public void go() throws ExecutionException, InterruptedException
     {
-        EthernetAddress nic = EthernetAddress.fromInterface();
-        final TimeBasedGenerator generator = Generators.timeBasedGenerator( nic );
-
         final GraphDatabaseService db = new GraphDatabaseFactory().newEmbeddedDatabase( dbPath.toString() );
-
         final long rootNodeId = createRootNode( db );
 
         long startTime = System.currentTimeMillis();
-
         int numberOfIterations = NODES_TO_CREATE / batchSize;
+        addNodes( db, rootNodeId, numberOfIterations );
 
+        long endTime = System.currentTimeMillis();
+        long elapsedTime = endTime - startTime;
+        long throughput = NODES_TO_CREATE * 1000 / elapsedTime;
+
+        System.out.println( "Batch Size: " + batchSize + ", Indexing: " + indexingStrategy.name() + ", Threads: " + numberOfThreads  + ", Throughput: " + throughput );
+//        System.out.println( "Batch Size: " + batchSize + ", Indexing: " + indexingStrategy.name()  + ", Throughput: " + throughput + ", nodeCount: " + nodeCount( db ) + ", relCount: " + relCount( db ) );
+        executor.shutdown();
+    }
+
+    private void addNodes( GraphDatabaseService db, long rootNodeId,
+                           int numberOfIterations ) throws InterruptedException, ExecutionException
+    {
+        final TimeBasedGenerator generator = Generators.timeBasedGenerator( EthernetAddress.fromInterface() );
         List<Callable<Object>> jobs = new ArrayList<>(numberOfIterations);
 
         for ( int i = 0; i < numberOfIterations; i++ )
@@ -101,14 +121,6 @@ public class WriteThroughput
         {
             future.get();
         }
-
-        long endTime = System.currentTimeMillis();
-        long elapsedTime = endTime - startTime;
-        long throughput = NODES_TO_CREATE * 1000 / elapsedTime;
-
-        System.out.println( "Batch Size: " + batchSize + ", Indexing: " + indexingStrategy.name() + ", Threads: " + numberOfThreads  + ", Throughput: " + throughput );
-//        System.out.println( "Batch Size: " + batchSize + ", Indexing: " + indexingStrategy.name()  + ", Throughput: " + throughput + ", nodeCount: " + nodeCount( db ) + ", relCount: " + relCount( db ) );
-        executor.shutdown();
     }
 
     private Object nodeCount( GraphDatabaseService db )
